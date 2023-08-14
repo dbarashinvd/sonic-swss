@@ -8,6 +8,7 @@
 #include "shellcmd.h"
 #include "warm_restart.h"
 #include <swss/redisutility.h>
+#include <linux/if.h>
 
 using namespace std;
 using namespace swss;
@@ -118,6 +119,7 @@ VlanMgr::VlanMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, c
 bool VlanMgr::addHostVlan(int vlan_id)
 {
     SWSS_LOG_ENTER();
+    SWSS_LOG_NOTICE("enter VlanMgr::addHostVlan with vlan_id %d", vlan_id);
 
     // The command should be generated as:
     // /bin/bash -c "/sbin/bridge vlan add vid {{vlan_id}} dev Bridge self &&
@@ -283,6 +285,7 @@ void VlanMgr::doVlanTask(Consumer &consumer)
     if (!isVlanMacOk())
     {
         SWSS_LOG_DEBUG("VLAN mac not ready, delaying VLAN task");
+        SWSS_LOG_NOTICE("VLAN mac not ready, delaying VLAN task");
         return;
     }
     auto it = consumer.m_toSync.begin();
@@ -301,10 +304,18 @@ void VlanMgr::doVlanTask(Consumer &consumer)
             continue;
         }
 
+        if (key.length() >= IFNAMSIZ)
+        {
+            SWSS_LOG_NOTICE("key %s is too long! The vlan_alias length needs to be less than %d characters" \
+                    , key.c_str(), IFNAMSIZ);
+            return;
+        }
+
         int vlan_id;
         try
         {
             vlan_id = stoi(key.substr(4));
+            SWSS_LOG_NOTICE("vlan_id %d derived from key %s", vlan_id, key.c_str());
         }
         catch (...)
         {
@@ -336,6 +347,7 @@ void VlanMgr::doVlanTask(Consumer &consumer)
             if (isVlanStateOk(key) && m_vlans.find(key) == m_vlans.end())
             {
                 SWSS_LOG_DEBUG("%s already created", kfvKey(t).c_str());
+                SWSS_LOG_NOTICE("%s already created", kfvKey(t).c_str());
                 m_vlans.insert(key);
                 m_vlanReplay.erase(kfvKey(t));
                 it = consumer.m_toSync.erase(it);
@@ -345,6 +357,7 @@ void VlanMgr::doVlanTask(Consumer &consumer)
             /* Add host VLAN when it has not been created. */
             if (m_vlans.find(key) == m_vlans.end())
             {
+                SWSS_LOG_NOTICE("adding host vlan with vlan_id %d", vlan_id);
                 addHostVlan(vlan_id);
             }
             m_vlanReplay.erase(kfvKey(t));

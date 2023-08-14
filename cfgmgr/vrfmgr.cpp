@@ -8,6 +8,7 @@
 #include "exec.h"
 #include "shellcmd.h"
 #include "warm_restart.h"
+#include <linux/if.h>
 
 #define VRF_TABLE_START 1001
 #define VRF_TABLE_END 2000
@@ -164,6 +165,7 @@ bool VrfMgr::delLink(const string& vrfName)
 bool VrfMgr::setLink(const string& vrfName)
 {
     SWSS_LOG_ENTER();
+    SWSS_LOG_NOTICE("enter VrfMgr::setLink %s", vrfName.c_str());
 
     stringstream cmd;
     string res;
@@ -217,6 +219,7 @@ bool VrfMgr::isVrfObjExist(const string& vrfName)
 void VrfMgr::doTask(Consumer &consumer)
 {
     SWSS_LOG_ENTER();
+    SWSS_LOG_NOTICE("enter VrfMgr::doTask");
 
     auto it = consumer.m_toSync.begin();
     while (it != consumer.m_toSync.end())
@@ -269,7 +272,7 @@ void VrfMgr::doTask(Consumer &consumer)
             }
             SWSS_LOG_DEBUG("Event for mgmt VRF op %s", op.c_str());
         }
-        SWSS_LOG_DEBUG("Event for table %s vrf netdev %s id %s", consumer.getTableName().c_str(), vrfName.c_str(), op.c_str());
+        SWSS_LOG_NOTICE("Event for table %s vrf netdev %s id %s", consumer.getTableName().c_str(), vrfName.c_str(), op.c_str());
         if (op == SET_COMMAND)
         {
             if (consumer.getTableName() == CFG_VXLAN_EVPN_NVO_TABLE_NAME)
@@ -278,6 +281,15 @@ void VrfMgr::doTask(Consumer &consumer)
             }
             else
             {
+                SWSS_LOG_NOTICE("adding vrf %s setting link", vrfName.c_str());
+		if (vrfName.length() >= IFNAMSIZ)
+                {
+                    SWSS_LOG_NOTICE("vrf name %s is too long! The vrf name length needs to be less than %d characters" \
+                                    , vrfName.c_str(), IFNAMSIZ);
+                    it = consumer.m_toSync.erase(it);
+                    continue;
+                }
+
                 if (!setLink(vrfName))
                 {
                     SWSS_LOG_ERROR("Failed to create vrf netdev %s", vrfName.c_str());

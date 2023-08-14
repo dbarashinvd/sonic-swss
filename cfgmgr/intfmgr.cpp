@@ -12,6 +12,7 @@
 #include "subscriberstatetable.h"
 #include <swss/redisutility.h>
 #include "subintf.h"
+#include <linux/if.h>
 
 using namespace std;
 using namespace swss;
@@ -334,6 +335,17 @@ void IntfMgr::addHostSubIntf(const string&intf, const string &subIntf, const str
     stringstream cmd;
     string res;
 
+    if (subIntf.length() >= IFNAMSIZ)
+    {
+        SWSS_LOG_NOTICE("sub interface name %s is too long! The sub interface name's length needs to be less than %d characters" \
+                , subIntf.c_str(), IFNAMSIZ);
+        return;
+    }
+    else
+    {
+        SWSS_LOG_NOTICE("adding sub interface name %s with lenght %lu less than %d characters" \
+                , subIntf.c_str(), subIntf.length(), IFNAMSIZ);
+    }
     cmd << IP_CMD " link add link " << shellquote(intf) << " name " << shellquote(subIntf) << " type vlan id " << shellquote(vlan);
     EXEC_WITH_ERROR_THROW(cmd.str(), res);
 }
